@@ -24,30 +24,17 @@ MODEL_NAME = "functiongemma:latest"
 class ChatRequest(BaseModel):
     messages: list
 
-class AgentResponse(BaseModel):
-    intent: str = "chat"
-    message: str
-    data: Optional[Dict[str, Any]] = {}
+class ChatRequest(BaseModel):
+    messages: list
 
 @app.get("/")
 def health_check():
     return {"status": "online", "model": MODEL_NAME}
 
-@app.post("/chat", response_model=AgentResponse)
+@app.post("/chat")
 async def chat(payload: ChatRequest):
-    # 1. Inject schema instructions into the system prompt
-    schema_instruction = (
-        "You are a helpful AI assistant. You must response in strictly valid JSON format "
-        "matching this structure: { 'intent': 'string', 'message': 'string', 'data': {} }. "
-        "Use 'intent' to categorize the user's request (e.g., 'greeting', 'question', 'command')."
-    )
-
+    # We pass messages directly to Ollama without forcing JSON structure
     messages = payload.messages
-    # Ensure system prompt is first
-    if messages and messages[0]['role'] != 'system':
-        messages.insert(0, {"role": "system", "content": schema_instruction})
-    elif messages and messages[0]['role'] == 'system':
-        messages[0]['content'] += f" {schema_instruction}"
 
     try:
         print(f"Sending request to Ollama ({MODEL_NAME})...")
@@ -55,31 +42,20 @@ async def chat(payload: ChatRequest):
             "model": MODEL_NAME,
             "messages": messages,
             "stream": False,
-            "format": "json" # Force Ollama to output JSON
+            # "format": "json"  <-- REMOVED to allow free-form text
         })
         res.raise_for_status()
         
         ollama_res = res.json()
-        content = ollama_res.get("message", {}).get("content", "{}")
+        content = ollama_res.get("message", {}).get("content", "")
         
-        # 2. Parse and Validate with Pydantic
-        try:
-            # Clean up potential markdown code blocks if the model adds them
-            if "```json" in content:
-                content = content.replace("```json", "").replace("```", "")
-            
-            parsed_json = json.loads(content)
-            agent_response = AgentResponse(**parsed_json)
-            return agent_response
-            
-        except (json.JSONDecodeError, ValueError) as e:
-            # Fallback if model fails strict JSON (rare with FunctionGemma + format='json')
-            print(f"JSON Parse Error: {e}. Raw content: {content}")
-            return AgentResponse(
-                intent="unknown", 
-                message=content if content else "Sorry, I couldn't process that correctly.",
-                data={"raw_error": str(e)}
-            )
+        # Return a simple structure compatible with frontend's basic expectation
+        # or just the raw content wrapped in a dict
+        return {
+            "intent": "chat", # dummy intent to keep frontend happy
+            "message": content,
+            "data": {}
+        }
 
     except requests.exceptions.ConnectionError:
         raise HTTPException(status_code=503, detail="Ollama is not running on port 11434.")
