@@ -3,7 +3,6 @@
 A production-ready mobile AI application featuring **voice-controlled browsing** with **on-device inference** capabilities. Built with Expo (React Native), FunctionGemma-270M-IT, and llama.cpp.
 
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-blue)]()
-[![License](https://img.shields.io/badge/License-MIT-green)]()
 [![Model](https://img.shields.io/badge/Model-FunctionGemma--270M-orange)]()
 
 ## Overview
