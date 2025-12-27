@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     StyleSheet,
     View,
@@ -7,6 +7,8 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
+    Vibration,
+    Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { ThemedText } from '@/components/themed-text';
@@ -14,19 +16,23 @@ import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import { parseVoiceCommand } from '../../services/voiceService';
 import { useVoiceRecognition } from '../../hooks/useVoiceRecognition';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function VoiceBrowserScreen() {
+    // State
     const [url, setUrl] = useState('https://www.google.com');
     const [currentUrl, setCurrentUrl] = useState('https://www.google.com');
     const [status, setStatus] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [isWebViewLoading, setIsWebViewLoading] = useState(false);
 
+    // Refs
     const webViewRef = useRef<WebView>(null);
     const feedbackOpacity = useRef(new Animated.Value(0)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Use cross-platform voice recognition hook
+    // Voice recognition hook
     const {
         isListening,
         transcript,
@@ -45,17 +51,34 @@ export default function VoiceBrowserScreen() {
         },
     });
 
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (hideTimer.current) {
+                clearTimeout(hideTimer.current);
+            }
+            stopListening();
+        };
+    }, []);
+
+    // Handle voice errors
     useEffect(() => {
         if (voiceError) {
             showFeedbackPanel('', `Voice Error: ${voiceError}`, true);
         }
     }, [voiceError]);
 
-    useEffect(() => {
-        return () => {
-            if (hideTimer.current) clearTimeout(hideTimer.current);
-        };
-    }, []);
+    // Load home page on mount
+    useFocusEffect(
+        useCallback(() => {
+            // Load home page when screen comes into focus
+            if (!url) {
+                loadHomePage();
+            }
+        }, [])
+    );
+
+    // MARK: - Voice Recognition
 
     const handleVoiceButtonPress = async () => {
         if (!isSupported) {
@@ -69,12 +92,16 @@ export default function VoiceBrowserScreen() {
 
         if (isListening) {
             stopListening();
+            provideHapticFeedback();
         } else {
             setStatus('Listening...');
             showFeedbackPanel('', 'Listening...');
+            provideHapticFeedback();
             await startListening();
         }
     };
+
+    // MARK: - Command Processing
 
     const processVoiceCommand = async (command: string) => {
         setIsProcessing(true);
@@ -92,7 +119,7 @@ export default function VoiceBrowserScreen() {
     };
 
     const executeFunction = (functionCall: any, originalCommand: string) => {
-        console.log('Executing:', functionCall.name, functionCall.parameters);
+        console.log('[VoiceBrowser] Executing:', functionCall.name, 'with params:', functionCall.parameters);
 
         switch (functionCall.name) {
             case 'open_browser':
@@ -138,13 +165,17 @@ export default function VoiceBrowserScreen() {
         scheduleFeedbackHide();
     };
 
+    // MARK: - URL Handling
+
     const normalizeURL = (urlString: string): string => {
         let normalized = urlString.trim();
 
+        // Add https:// if no scheme
         if (!normalized.includes('://')) {
             normalized = `https://${normalized}`;
         }
 
+        // Handle common shortcuts (e.g., "google" -> "www.google.com")
         if (!normalized.includes('.') && !normalized.includes('localhost')) {
             normalized = normalized.replace('https://', 'https://www.');
             normalized += '.com';
@@ -158,26 +189,41 @@ export default function VoiceBrowserScreen() {
         setCurrentUrl(urlString);
     };
 
-    const handleUrlSubmit = () => {
-        const normalized = normalizeURL(currentUrl);
-        loadURL(normalized);
+    const loadHomePage = () => {
+        loadURL('https://www.google.com');
     };
+
+    const handleUrlSubmit = () => {
+        if (currentUrl.trim()) {
+            const normalized = normalizeURL(currentUrl);
+            loadURL(normalized);
+        }
+    };
+
+    // MARK: - Feedback UI
 
     const showFeedbackPanel = (transcriptText: string, statusText: string, isError = false) => {
         // Note: transcript is managed by the voice recognition hook
-        // We show transcriptText in the feedback panel directly
         setStatus(statusText);
         setShowFeedback(true);
 
+        // Animate feedback panel in
         Animated.timing(feedbackOpacity, {
             toValue: 1,
             duration: 200,
             useNativeDriver: true,
         }).start();
+
+        // Auto-hide after delay if error
+        if (isError) {
+            scheduleFeedbackHide(5000);
+        }
     };
 
     const scheduleFeedbackHide = (delay = 3000) => {
-        if (hideTimer.current) clearTimeout(hideTimer.current);
+        if (hideTimer.current) {
+            clearTimeout(hideTimer.current);
+        }
 
         hideTimer.current = setTimeout(() => {
             Animated.timing(feedbackOpacity, {
@@ -188,6 +234,35 @@ export default function VoiceBrowserScreen() {
                 setShowFeedback(false);
             });
         }, delay);
+    };
+
+    // MARK: - WebView Handlers
+
+    const handleWebViewLoadStart = () => {
+        setIsWebViewLoading(true);
+    };
+
+    const handleWebViewLoadEnd = () => {
+        setIsWebViewLoading(false);
+        // Hide feedback after navigation completes
+        scheduleFeedbackHide(1000);
+    };
+
+    const handleWebViewError = (error: any) => {
+        setIsWebViewLoading(false);
+        showFeedbackPanel('', `Failed to load page: ${error.description || 'Unknown error'}`, true);
+    };
+
+    const handleNavigationStateChange = (navState: any) => {
+        setCurrentUrl(navState.url);
+    };
+
+    // MARK: - Utilities
+
+    const provideHapticFeedback = () => {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+            Vibration.vibrate(10); // Short vibration (10ms)
+        }
     };
 
     return (
@@ -205,6 +280,7 @@ export default function VoiceBrowserScreen() {
                     autoCorrect={false}
                     keyboardType="url"
                     returnKeyType="go"
+                    clearButtonMode="while-editing"
                 />
 
                 <TouchableOpacity
@@ -225,10 +301,22 @@ export default function VoiceBrowserScreen() {
                 ref={webViewRef}
                 source={{ uri: url }}
                 style={styles.webView}
-                onNavigationStateChange={(navState) => {
-                    setCurrentUrl(navState.url);
-                }}
+                onLoadStart={handleWebViewLoadStart}
+                onLoadEnd={handleWebViewLoadEnd}
+                onError={(syntheticEvent) => handleWebViewError(syntheticEvent.nativeEvent)}
+                onNavigationStateChange={handleNavigationStateChange}
+                allowsInlineMediaPlayback={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
             />
+
+            {/* Loading Indicator (top of WebView) */}
+            {isWebViewLoading && (
+                <View style={styles.loadingBar}>
+                    <ActivityIndicator size="small" color="#007AFF" />
+                </View>
+            )}
 
             {/* Feedback Panel */}
             {showFeedback && (
@@ -238,7 +326,12 @@ export default function VoiceBrowserScreen() {
                     ) : null}
 
                     <View style={styles.statusRow}>
-                        <ThemedText style={styles.status}>{status}</ThemedText>
+                        <ThemedText style={[
+                            styles.status,
+                            status.toLowerCase().includes('error') && styles.statusError
+                        ]}>
+                            {status}
+                        </ThemedText>
                         {isProcessing && <ActivityIndicator size="small" style={styles.spinner} />}
                     </View>
                 </Animated.View>
@@ -259,6 +352,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f8f8',
         borderBottomWidth: 1,
         borderBottomColor: '#ddd',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
     },
     urlBar: {
         flex: 1,
@@ -285,6 +389,16 @@ const styles = StyleSheet.create({
     webView: {
         flex: 1,
     },
+    loadingBar: {
+        position: 'absolute',
+        top: 56, // Below nav bar
+        left: 0,
+        right: 0,
+        height: 3,
+        backgroundColor: 'rgba(0, 122, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     feedbackPanel: {
         position: 'absolute',
         bottom: 20,
@@ -293,11 +407,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderRadius: 12,
         padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 5,
+            },
+        }),
     },
     transcript: {
         fontSize: 16,
@@ -314,6 +434,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         textAlign: 'center',
+    },
+    statusError: {
+        color: '#ff3b30',
     },
     spinner: {
         marginLeft: 8,

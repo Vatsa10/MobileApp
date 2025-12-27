@@ -1,39 +1,39 @@
-# Nova: Edge-Native AI Orchestration Architecture
+# Nova: On-Device AI Voice Browser
 
-A production-ready mobile AI application featuring **voice-controlled browsing** with **on-device inference** capabilities. Built with Expo (React Native), FunctionGemma-270M-IT, and llama.cpp.
+A production-ready mobile AI application featuring voice-controlled browsing with 100% on-device inference. Built with Expo (React Native), FunctionGemma-270M-IT, and llama.cpp.
 
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-blue)]()
 [![Model](https://img.shields.io/badge/Model-FunctionGemma--270M-orange)]()
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20On--Device-brightgreen)]()
 
 ## Overview
 
-Nova is a hybrid AI architecture that enables **privacy-preserving, low-latency inference** on mobile devices. It supports both **on-device** and **cloud-based** inference, providing flexibility for different deployment scenarios.
+Nova is a privacy-first mobile AI browser that runs entirely on your device. No backend server, no cloud processing, no data transmission - just pure on-device AI inference.
 
 ### Key Features
 
 - **Native Voice Recognition** - Cross-platform speech-to-text (iOS, Android, Web)
 - **Voice-Controlled Browser** - Navigate the web using natural language
-- **On-Device AI** - Run FunctionGemma locally via llama.cpp
-- **Cloud Fallback** - Automatic backend fallback when needed
-- **Privacy-First** - All data stays on device in on-device mode
-- **Fast** - Sub-second inference with GPU acceleration
+- **On-Device AI** - 100% local inference via llama.cpp
+- **Complete Privacy** - All data stays on your device
+- **Fast Performance** - Sub-second inference with GPU acceleration
 - **Cross-Platform** - iOS, Android, and Web support
+- **Offline Operation** - Works without internet connection
 
 ## Architecture
 
 ```mermaid
 graph TD
     A[Mobile Client / Expo] -->|Voice Input| B[Voice Recognition]
-    B --> C{Inference Mode}
-    C -->|On-Device| D[llama.cpp Local]
-    C -->|Backend| E[FastAPI Gateway]
-    C -->|Auto| F[Try Local → Fallback Remote]
-    D --> G[FunctionGemma GGUF]
-    E --> H[Ollama Server]
-    H --> I[FunctionGemma]
-    G --> J[Function Call]
-    I --> J
-    J --> K[Browser Action]
+    B --> C[On-Device Inference]
+    C --> D[llama.rn / llama.cpp]
+    D --> E[FunctionGemma GGUF]
+    E --> F[Function Call]
+    F --> G[Browser Action]
+    
+    style C fill:#34C759
+    style E fill:#FF9500
+    style G fill:#007AFF
 ```
 
 ### Components
@@ -42,24 +42,22 @@ graph TD
 |-------|-----------|---------|
 | **Client** | Expo (React Native) | Cross-platform mobile UI |
 | **Voice** | Native Speech Recognition | Voice input processing |
-| **Inference (Local)** | llama.rn (llama.cpp) | On-device AI inference |
-| **Inference (Cloud)** | FastAPI + Ollama | Remote inference fallback |
-| **Model** | FunctionGemma-270M-IT | Function calling LLM |
+| **Inference** | llama.rn (llama.cpp) | On-device AI inference |
+| **Model** | FunctionGemma-270M-IT (GGUF) | Function calling LLM |
 
 ## Quick Start
 
 ### Prerequisites
 
 - **Node.js** 18+ and npm
-- **Python** 3.10+ (for backend)
-- **Ollama** (for cloud mode)
 - **Expo CLI** (installed automatically)
+- **FunctionGemma Model** (~150MB)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Vatsa10/Novaa
+git clone https://github.com/Vatsa10/Novaa.git
 cd Novaa
 
 # Install dependencies
@@ -67,7 +65,7 @@ cd ai-mobile
 npm install
 ```
 
-### Option 1: On-Device Mode (Recommended)
+### Setup
 
 **Step 1: Download Model**
 ```powershell
@@ -88,35 +86,12 @@ npx expo run:android
 
 # iOS (requires Mac)
 npx expo run:ios
+
+# Web (for testing)
+npx expo start --web
 ```
 
-The app will automatically load the bundled model on first launch!
-
-### Option 2: Cloud Mode (Simpler Setup)
-
-**Step 1: Start Backend**
-```bash
-cd backend
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
-
-pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Step 2: Pull Model**
-```bash
-ollama pull functiongemma
-```
-
-**Step 3: Run App**
-```bash
-cd ai-mobile
-npx expo start --tunnel
-```
-
-Scan QR code with Expo Go app!
+The application will automatically load the bundled model on first launch.
 
 ## Features
 
@@ -132,32 +107,27 @@ Navigate the web using natural language commands:
 | `go forward` | Browser forward | "go forward" |
 | `refresh page` | Reload | "refresh page" |
 
-### 2. Hybrid Inference System
+### 2. On-Device AI Inference
 
-Three inference modes with automatic fallback:
+**100% Privacy**
+- All AI processing happens on your device
+- No data transmitted to servers
+- No cloud dependencies
+- Works completely offline
 
-**AUTO Mode** (Default)
-- Tries on-device first
-- Falls back to backend if unavailable
-- Best user experience
-
-**ON_DEVICE Mode**
-- 100% local inference
-- Maximum privacy
-- Works offline
-
-**BACKEND Mode**
-- Uses remote server
-- Lower memory usage
-- Easier setup
+**Fast Performance**
+- Sub-second inference
+- GPU/Metal acceleration
+- Optimized GGUF quantization
+- Efficient memory usage
 
 ### 3. Cross-Platform Voice Recognition
 
 | Platform | Technology | Status |
 |----------|-----------|--------|
-| **iOS** | Native Speech Recognition | ✅ Fully Supported |
-| **Android** | Native Speech Recognition | ✅ Fully Supported |
-| **Web** | Web Speech API | ✅ Supported (Chrome/Edge) |
+| **iOS** | Native Speech Recognition | Fully Supported |
+| **Android** | Native Speech Recognition | Fully Supported |
+| **Web** | Web Speech API | Supported (Chrome/Edge) |
 
 ## Project Structure
 
@@ -166,54 +136,44 @@ Nova/
 ├── ai-mobile/                  # Expo React Native app
 │   ├── app/
 │   │   ├── (tabs)/
-│   │   │   ├── index.tsx      # Chat interface
+│   │   │   ├── index.tsx      # Home/Welcome screen
 │   │   │   ├── browser.tsx    # Voice browser
 │   │   │   └── settings.tsx   # Model management
 │   │   └── _layout.tsx        # Root layout (auto-init)
 │   ├── services/
 │   │   ├── llamaEngine.ts     # llama.cpp wrapper
-│   │   ├── voiceService.ts    # Hybrid inference
-│   │   └── api.ts             # Backend API client
+│   │   └── voiceService.ts    # On-device inference
 │   ├── hooks/
 │   │   └── useVoiceRecognition.ts  # Cross-platform voice
 │   └── assets/
 │       └── models/             # Bundled AI models
 │
-├── backend/                    # FastAPI server
-│   ├── main.py                # API endpoints
-│   └── requirements.txt       # Python dependencies
-│
 └── docs/
     ├── ON_DEVICE_INFERENCE.md # On-device setup guide
     ├── MODEL_BUNDLING_GUIDE.md # Model bundling guide
+    ├── BACKEND_REMOVAL.md     # Migration notes
     └── QUICK_SETUP.md         # Quick reference
 ```
 
 ## Configuration
 
-### Inference Mode
+### Model Bundling
 
-```typescript
-import { setInferenceMode, InferenceMode } from '@/services/voiceService';
+The application automatically loads the bundled model from `assets/models/`. To bundle a different model:
 
-// Auto mode (default)
-setInferenceMode(InferenceMode.AUTO);
+1. Download your model (`.gguf` format)
+2. Place in `ai-mobile/assets/models/`
+3. Update path in `llamaEngine.ts` if needed
+4. Rebuild: `npx expo run:android`
 
-// On-device only
-setInferenceMode(InferenceMode.ON_DEVICE);
+### Manual Model Loading
 
-// Backend only
-setInferenceMode(InferenceMode.BACKEND);
-```
+Users can also load models manually via Settings:
 
-### Backend URL
-
-The app automatically detects your local IP. For manual configuration:
-
-```typescript
-// ai-mobile/services/voiceService.ts
-const API_URL = 'http://YOUR_IP:8000';
-```
+1. Download FunctionGemma GGUF
+2. Transfer to device
+3. Settings → Load Model
+4. Select `.gguf` file
 
 ## Performance
 
@@ -232,6 +192,8 @@ const API_URL = 'http://YOUR_IP:8000';
 | Q4_K_M | ~150MB | Good | Fast |
 | Q5_K_M | ~180MB | Better | Medium |
 | Q8_0 | ~270MB | Best | Slower |
+
+**Recommended**: Q4_K_M for best balance
 
 ## Development
 
@@ -259,8 +221,7 @@ eas build --platform ios --profile production
 Create `.env` file in `ai-mobile/`:
 
 ```env
-EXPO_PUBLIC_API_URL=http://localhost:8000
-EXPO_PUBLIC_INFERENCE_MODE=auto
+EXPO_PUBLIC_MODEL_PATH=assets/models/functiongemma-270m-it-Q4_K_M.gguf
 ```
 
 ## Deployment
@@ -281,6 +242,30 @@ EXPO_PUBLIC_INFERENCE_MODE=auto
 
 Code and UI updates work via Expo OTA. Model updates require full app rebuild.
 
+## Privacy & Security
+
+### Data Privacy
+
+**100% On-Device Processing**
+- All AI inference happens locally
+- No data sent to external servers
+- No analytics or tracking
+- No internet required for AI
+
+**Secure Storage**
+- Models stored in app sandbox
+- No cloud synchronization
+- User data never leaves device
+
+### Permissions
+
+**iOS**:
+- Microphone (for voice input)
+- Speech Recognition (for voice commands)
+
+**Android**:
+- RECORD_AUDIO (for voice input)
+
 ## Troubleshooting
 
 ### Common Issues
@@ -290,15 +275,15 @@ Code and UI updates work via Expo OTA. Model updates require full app rebuild.
 - Run `npx expo prebuild` to regenerate native projects
 - Check console logs for errors
 
-**"Backend connection failed"**
-- Verify backend is running on port 8000
-- Check firewall settings
-- Ensure device and computer on same WiFi
-
 **"Voice recognition not working"**
 - Grant microphone permissions
 - Use development build (not Expo Go)
 - Check platform support
+
+**"Out of memory"**
+- Use Q4_K_M quantization (not Q8_0)
+- Close other apps
+- Reduce context window in settings
 
 See [Troubleshooting Guide](./ai-mobile/docs/ON_DEVICE_INFERENCE.md#troubleshooting) for more details.
 
@@ -307,17 +292,18 @@ See [Troubleshooting Guide](./ai-mobile/docs/ON_DEVICE_INFERENCE.md#troubleshoot
 - **[On-Device Inference Guide](./ai-mobile/docs/ON_DEVICE_INFERENCE.md)** - Complete setup for local inference
 - **[Model Bundling Guide](./ai-mobile/docs/MODEL_BUNDLING_GUIDE.md)** - Bundle model with your app
 - **[Quick Setup](./ai-mobile/docs/QUICK_SETUP.md)** - Quick reference card
-- **[API Documentation](./ai-mobile/docs/API.md)** - Backend API reference
 
 ## Roadmap
 
-- [ ] Streaming token generation
-- [ ] Multi-modal support (images + voice)
-- [ ] Custom function definitions
-- [ ] Model quantization options in UI
-- [ ] Offline model download manager
-- [ ] Context caching for faster responses
-- [ ] Additional browser commands (scroll, click, form fill)
+- Streaming token generation
+- Multi-modal support (images + voice)
+- Custom function definitions
+- Model quantization options in UI
+- Context caching for faster responses
+- Additional browser commands (scroll, click, form fill)
+- Bookmark management
+- History tracking
+- Tab management
 
 ## Acknowledgments
 
@@ -328,7 +314,10 @@ See [Troubleshooting Guide](./ai-mobile/docs/ON_DEVICE_INFERENCE.md#troubleshoot
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Vatsa10/MobileApp/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Vatsa10/MobileApp/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Vatsa10/Novaa/issues)
 
 ---
+
+Built with Expo, React Native, and llama.cpp
+
+**100% Privacy • 100% On-Device • 100% Offline**

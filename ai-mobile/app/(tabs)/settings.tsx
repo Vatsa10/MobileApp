@@ -5,7 +5,6 @@ import {
     TouchableOpacity,
     Alert,
     ScrollView,
-    Switch,
     ActivityIndicator,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -13,21 +12,15 @@ import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import {
     initializeOnDeviceInference,
-    setInferenceMode,
-    getInferenceMode,
     isOnDeviceAvailable,
     getInferenceStats,
-    InferenceMode,
 } from '../../services/voiceService';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 
 export default function SettingsScreen() {
-    const [inferenceMode, setLocalInferenceMode] = useState<InferenceMode>(InferenceMode.AUTO);
     const [onDeviceReady, setOnDeviceReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [modelPath, setModelPath] = useState<string | null>(null);
-    const [stats, setStats] = useState(getInferenceStats());
 
     useEffect(() => {
         refreshStats();
@@ -35,8 +28,6 @@ export default function SettingsScreen() {
 
     const refreshStats = () => {
         const currentStats = getInferenceStats();
-        setStats(currentStats);
-        setLocalInferenceMode(currentStats.mode);
         setOnDeviceReady(currentStats.onDeviceAvailable);
     };
 
@@ -86,43 +77,6 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleModeChange = (mode: InferenceMode) => {
-        if (mode === InferenceMode.ON_DEVICE && !onDeviceReady) {
-            Alert.alert(
-                'Model Not Loaded',
-                'Please load a model first to use on-device inference.',
-                [{ text: 'OK' }]
-            );
-            return;
-        }
-
-        setInferenceMode(mode);
-        setLocalInferenceMode(mode);
-        refreshStats();
-    };
-
-    const getModeIcon = (mode: InferenceMode): string => {
-        switch (mode) {
-            case InferenceMode.ON_DEVICE:
-                return 'phone-portrait';
-            case InferenceMode.BACKEND:
-                return 'cloud';
-            case InferenceMode.AUTO:
-                return 'flash';
-        }
-    };
-
-    const getModeDescription = (mode: InferenceMode): string => {
-        switch (mode) {
-            case InferenceMode.ON_DEVICE:
-                return 'All inference runs locally on your device. Fastest and most private.';
-            case InferenceMode.BACKEND:
-                return 'Uses remote backend server. Requires network connection.';
-            case InferenceMode.AUTO:
-                return 'Tries on-device first, falls back to backend if unavailable.';
-        }
-    };
-
     return (
         <ThemedView style={styles.container}>
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -131,7 +85,7 @@ export default function SettingsScreen() {
                 <View style={styles.header}>
                     <ThemedText style={styles.title}>AI Settings</ThemedText>
                     <ThemedText style={styles.subtitle}>
-                        Configure on-device inference and model settings
+                        Configure on-device AI inference
                     </ThemedText>
                 </View>
 
@@ -179,48 +133,34 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* Inference Mode */}
+                {/* Info Card */}
                 <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Inference Mode</ThemedText>
-
-                    {[InferenceMode.AUTO, InferenceMode.ON_DEVICE, InferenceMode.BACKEND].map((mode) => (
-                        <TouchableOpacity
-                            key={mode}
-                            style={[
-                                styles.modeCard,
-                                inferenceMode === mode && styles.modeCardActive,
-                            ]}
-                            onPress={() => handleModeChange(mode)}
-                        >
-                            <View style={styles.modeHeader}>
-                                <Ionicons
-                                    name={getModeIcon(mode) as any}
-                                    size={24}
-                                    color={inferenceMode === mode ? '#007AFF' : '#666'}
-                                />
-                                <ThemedText style={[
-                                    styles.modeTitle,
-                                    inferenceMode === mode && styles.modeTitleActive,
-                                ]}>
-                                    {mode.replace('_', ' ').toUpperCase()}
-                                </ThemedText>
-                                {inferenceMode === mode && (
-                                    <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
-                                )}
-                            </View>
-                            <ThemedText style={styles.modeDescription}>
-                                {getModeDescription(mode)}
-                            </ThemedText>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Backend Info */}
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Backend Server</ThemedText>
+                    <ThemedText style={styles.sectionTitle}>About</ThemedText>
                     <View style={styles.infoCard}>
-                        <ThemedText style={styles.infoLabel}>URL:</ThemedText>
-                        <ThemedText style={styles.infoValue}>{stats.backendUrl}</ThemedText>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="phone-portrait" size={20} color="#007AFF" />
+                            <ThemedText style={styles.infoText}>
+                                All AI processing happens on your device
+                            </ThemedText>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="lock-closed" size={20} color="#34C759" />
+                            <ThemedText style={styles.infoText}>
+                                Your data never leaves your device
+                            </ThemedText>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="flash" size={20} color="#FF9500" />
+                            <ThemedText style={styles.infoText}>
+                                Fast inference with GPU acceleration
+                            </ThemedText>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="cloud-offline" size={20} color="#666" />
+                            <ThemedText style={styles.infoText}>
+                                Works completely offline
+                            </ThemedText>
+                        </View>
                     </View>
                 </View>
 
@@ -241,10 +181,37 @@ export default function SettingsScreen() {
                             4. Wait for model to load (may take 10-30 seconds)
                         </ThemedText>
                         <ThemedText style={styles.instructionStep}>
-                            5. Switch to "ON DEVICE" mode for offline usage
+                            5. Start using voice commands!
                         </ThemedText>
                     </View>
                 </View>
+
+                {/* Model Info */}
+                {onDeviceReady && (
+                    <View style={styles.section}>
+                        <ThemedText style={styles.sectionTitle}>Model Information</ThemedText>
+                        <View style={styles.infoCard}>
+                            <View style={styles.modelInfoRow}>
+                                <ThemedText style={styles.modelInfoLabel}>Model:</ThemedText>
+                                <ThemedText style={styles.modelInfoValue}>FunctionGemma-270M-IT</ThemedText>
+                            </View>
+                            <View style={styles.modelInfoRow}>
+                                <ThemedText style={styles.modelInfoLabel}>Quantization:</ThemedText>
+                                <ThemedText style={styles.modelInfoValue}>Q4_K_M</ThemedText>
+                            </View>
+                            <View style={styles.modelInfoRow}>
+                                <ThemedText style={styles.modelInfoLabel}>Size:</ThemedText>
+                                <ThemedText style={styles.modelInfoValue}>~150MB</ThemedText>
+                            </View>
+                            <View style={styles.modelInfoRow}>
+                                <ThemedText style={styles.modelInfoLabel}>Status:</ThemedText>
+                                <ThemedText style={[styles.modelInfoValue, styles.statusReady]}>
+                                    Ready
+                                </ThemedText>
+                            </View>
+                        </View>
+                    </View>
+                )}
 
             </ScrollView>
         </ThemedView>
@@ -326,50 +293,21 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    modeCard: {
-        backgroundColor: '#f8f8f8',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    modeCardActive: {
-        borderColor: '#007AFF',
-        backgroundColor: '#E6F4FE',
-    },
-    modeHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-        gap: 12,
-    },
-    modeTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        flex: 1,
-    },
-    modeTitleActive: {
-        color: '#007AFF',
-    },
-    modeDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
     infoCard: {
         backgroundColor: '#f8f8f8',
         borderRadius: 12,
         padding: 16,
     },
-    infoLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 4,
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
     },
-    infoValue: {
+    infoText: {
         fontSize: 14,
-        color: '#666',
+        color: '#333',
+        marginLeft: 12,
+        flex: 1,
     },
     instructionsCard: {
         backgroundColor: '#FFF9E6',
@@ -381,5 +319,21 @@ const styles = StyleSheet.create({
         color: '#333',
         marginBottom: 8,
         lineHeight: 20,
+    },
+    modelInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    modelInfoLabel: {
+        fontSize: 14,
+        color: '#666',
+    },
+    modelInfoValue: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    statusReady: {
+        color: '#34C759',
     },
 });

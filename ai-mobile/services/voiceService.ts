@@ -1,33 +1,20 @@
-import axios from 'axios';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+/**
+ * Voice Service - On-Device Only
+ * 
+ * This service handles voice command parsing using on-device inference only.
+ * No backend server required.
+ */
+
 import { getFunctionGemmaEngine, FunctionCall } from './llamaEngine';
-
-const getBackendUrl = () => {
-    if (Platform.OS === 'android' && !Constants.isDevice) {
-        return 'http://10.0.2.2:8000';
-    }
-
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    if (debuggerHost) {
-        const ip = debuggerHost.split(':')[0];
-        return `http://${ip}:8000`;
-    }
-
-    return 'http://localhost:8000';
-}
-
-const API_URL = getBackendUrl();
 
 export type { FunctionCall };
 
 export enum InferenceMode {
     ON_DEVICE = 'on_device',
-    BACKEND = 'backend',
-    AUTO = 'auto',
+    AUTO = 'auto', // Same as ON_DEVICE (kept for compatibility)
 }
 
-let currentMode: InferenceMode = InferenceMode.AUTO;
+let currentMode: InferenceMode = InferenceMode.ON_DEVICE;
 let onDeviceAvailable = false;
 let autoInitAttempted = false;
 
@@ -62,7 +49,7 @@ export async function autoInitializeOnDevice(): Promise<boolean> {
 }
 
 /**
- * Initialize on-device inference
+ * Initialize on-device inference with custom model path
  * @param modelPath Path to the .gguf model file
  * @returns true if successful
  */
@@ -86,7 +73,7 @@ export async function initializeOnDeviceInference(modelPath: string): Promise<bo
 }
 
 /**
- * Set the inference mode
+ * Set the inference mode (kept for compatibility)
  */
 export function setInferenceMode(mode: InferenceMode): void {
     currentMode = mode;
@@ -114,79 +101,35 @@ async function parseCommandOnDevice(command: string): Promise<FunctionCall> {
     const engine = getFunctionGemmaEngine();
 
     if (!engine.isModelLoaded()) {
-        throw new Error('On-device model not loaded');
+        throw new Error('On-device model not loaded. Please load a model first.');
     }
 
     return await engine.parseCommand(command);
 }
 
 /**
- * Parse voice command using backend API
+ * Parse voice command (on-device only)
+ * 
+ * @param command Natural language command
+ * @returns Parsed function call
+ * @throws Error if model not loaded
  */
-async function parseCommandViaBackend(command: string): Promise<FunctionCall> {
+export async function parseVoiceCommand(command: string): Promise<FunctionCall> {
+    console.log(`[VoiceService] Parsing command (on-device):`, command);
+
     try {
-        const response = await axios.post(`${API_URL}/parse-command`, {
-            command,
-        }, {
-            timeout: 10000, // 10 second timeout
-        });
-        return response.data;
+        const result = await parseCommandOnDevice(command);
+        console.log('[VoiceService] Parsed successfully:', result);
+        return result;
     } catch (error: any) {
-        console.error('Backend parsing error:', error);
+        console.error('[VoiceService] Parsing failed:', error);
 
-        if (error.response?.status === 503) {
-            throw new Error('Backend server is not running');
-        }
-
-        // Fallback: treat as search
+        // Fallback: treat as search query
+        console.log('[VoiceService] Falling back to search');
         return {
             name: 'search_web',
             parameters: { query: command },
         };
-    }
-}
-
-/**
- * Parse voice command with automatic fallback
- * 
- * Strategy:
- * 1. If mode is ON_DEVICE: use on-device only
- * 2. If mode is BACKEND: use backend only
- * 3. If mode is AUTO: try on-device first, fallback to backend
- */
-export async function parseVoiceCommand(command: string): Promise<FunctionCall> {
-    console.log(`[VoiceService] Parsing command (mode: ${currentMode}):`, command);
-
-    try {
-        switch (currentMode) {
-            case InferenceMode.ON_DEVICE:
-                return await parseCommandOnDevice(command);
-
-            case InferenceMode.BACKEND:
-                return await parseCommandViaBackend(command);
-
-            case InferenceMode.AUTO:
-            default:
-                // Try on-device first if available
-                if (onDeviceAvailable) {
-                    try {
-                        const result = await parseCommandOnDevice(command);
-                        console.log('[VoiceService] Used on-device inference');
-                        return result;
-                    } catch (onDeviceError) {
-                        console.warn('[VoiceService] On-device failed, falling back to backend:', onDeviceError);
-                        // Fall through to backend
-                    }
-                }
-
-                // Fallback to backend
-                const result = await parseCommandViaBackend(command);
-                console.log('[VoiceService] Used backend inference');
-                return result;
-        }
-    } catch (error: any) {
-        console.error('[VoiceService] All parsing methods failed:', error);
-        throw error;
     }
 }
 
@@ -196,11 +139,9 @@ export async function parseVoiceCommand(command: string): Promise<FunctionCall> 
 export function getInferenceStats(): {
     mode: InferenceMode;
     onDeviceAvailable: boolean;
-    backendUrl: string;
 } {
     return {
         mode: currentMode,
         onDeviceAvailable,
-        backendUrl: API_URL,
     };
 }
